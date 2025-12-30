@@ -2,7 +2,7 @@
 # FILE: src/document_processor.py
 # ============================================
 """Document processing utilities for PDF extraction and text chunking"""
-import PyPDF2
+import pypdf
 from typing import List
 import io
 
@@ -16,7 +16,7 @@ def extract_text_from_pdf(pdf_file) -> str:
     Returns:
         str: Extracted text from all pages
     """
-    pdf_reader = PyPDF2.PdfReader(pdf_file)
+    pdf_reader = pypdf.PdfReader(pdf_file)
     text = ""
     
     for page in pdf_reader.pages:

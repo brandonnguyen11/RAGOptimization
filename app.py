@@ -56,9 +56,12 @@ with st.sidebar:
     if st.session_state.document_indexed:
         st.info("📄 Document ready")
         if st.button("🗑️ Clear"):
+            # Trigger the method you just showed me
+            st.session_state.rag_pipeline.vector_store.clear()
+            
+            # Reset UI states
             st.session_state.messages = []
             st.session_state.document_indexed = False
-            st.session_state.rag_pipeline = None
             st.rerun()
 
 # Main UI

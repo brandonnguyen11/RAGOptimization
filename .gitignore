@@ -39,4 +39,5 @@ data/uploads/
 .pytest_cache/
 htmlcov/
 .coverage
-
+.structure.txt
+.codeHelp.text
