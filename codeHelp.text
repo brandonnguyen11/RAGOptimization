@@ -2,6 +2,6 @@ python3 -m venv venv
 
 
 .\venv\Scripts\activate
-
+deactivate
 
 python -m streamlit run app.py
