@@ -1,6 +1,3 @@
-# ============================================
-# FILE: README.md
-# ============================================
 # 📊 Financial Report RAG Chatbot
 
 AI-powered financial report analysis using RAG (Retrieval-Augmented Generation) to eliminate hallucinations and provide accurate, data-driven insights.
