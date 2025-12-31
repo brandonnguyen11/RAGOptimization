@@ -22,6 +22,8 @@ if 'rag_pipeline' not in st.session_state:
     st.session_state.rag_pipeline = None
 if 'document_indexed' not in st.session_state:
     st.session_state.document_indexed = False
+if 'indexed_files' not in st.session_state:
+    st.session_state.indexed_files = []
 
 # Sidebar - Configuration
 with st.sidebar:
@@ -31,36 +33,46 @@ with st.sidebar:
     api_key = st.text_input(f"{api_choice} API Key", type="password")
     
     st.divider()
-    st.header("📁 Upload Financial Report")
-    
-    uploaded_file = st.file_uploader("Choose a PDF file", type=['pdf'])
-    
-    if uploaded_file and not st.session_state.document_indexed:
-        with st.spinner("Processing and indexing document..."):
-            text = extract_text_from_pdf(uploaded_file)
-            chunks = chunk_text(text, CHUNK_SIZE, CHUNK_OVERLAP)
-            
-            # Initialize RAG pipeline
-            vector_store = VectorStore()
-            vector_store.index_chunks(chunks, uploaded_file.name)
-            
-            st.session_state.rag_pipeline = RAGPipeline(
-                vector_store=vector_store,
-                api_choice=api_choice,
-                api_key=api_key
-            )
-            
-            st.session_state.document_indexed = True
-            st.success(f"✅ Indexed {len(chunks)} chunks!")
+    st.header("📁 Upload Financial Reports")
+    uploaded_files = st.file_uploader("Choose PDF files", type=['pdf'], accept_multiple_files=True)
+
+    # Check if there are NEW files to process
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            if uploaded_file.name not in st.session_state.indexed_files:
+                with st.spinner(f"Indexing {uploaded_file.name}..."):
+                    # 1. Extract and Chunk
+                    text = extract_text_from_pdf(uploaded_file)
+                    chunks = chunk_text(text, CHUNK_SIZE, CHUNK_OVERLAP)
+                    
+                    # 2. Initialize VectorStore ONLY if it doesn't exist
+                    if st.session_state.rag_pipeline is None:
+                        vs = VectorStore()
+                        st.session_state.rag_pipeline = RAGPipeline(
+                            vector_store=vs,
+                            api_choice=api_choice,
+                            api_key=api_key
+                        )
+                    
+                    # 3. Add chunks to the existing vector store
+                    st.session_state.rag_pipeline.vector_store.index_chunks(chunks, uploaded_file.name)
+                    st.session_state.indexed_files.append(uploaded_file.name)
+                    st.session_state.document_indexed = True
+                    st.success(f"✅ Added {uploaded_file.name}")
+
+    # Display List of Loaded Documents
+    if st.session_state.indexed_files:
+        st.write("---")
+        st.write("📊 **Currently Indexed:**")
+        for f in st.session_state.indexed_files:
+            st.caption(f"• {f}")
     
     if st.session_state.document_indexed:
         st.info("📄 Document ready")
-        if st.button("🗑️ Clear"):
-            # Trigger the method you just showed me
+        if st.button("🗑️ Clear All Documents"):
             st.session_state.rag_pipeline.vector_store.clear()
-            
-            # Reset UI states
             st.session_state.messages = []
+            st.session_state.indexed_files = [] # Reset file tracker
             st.session_state.document_indexed = False
             st.rerun()
 
