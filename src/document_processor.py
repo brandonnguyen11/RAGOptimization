@@ -3,10 +3,22 @@
 # ============================================
 """Document processing utilities for PDF extraction and text chunking"""
 import pypdf
-from typing import List
+from typing import List,Generator
 import io
 
-def extract_text_from_pdf(pdf_file) -> str:
+def process_pdf(pdf_file, chunk_size, chunk_overlap):
+    """Processes a PDF page-by-page to save memory"""
+    pdf_reader = pypdf.PdfReader(pdf_file)
+    all_chunks = []
+    for page in pdf_reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            # Chunk the individual page text immediately
+            page_chunks = chunk_text(page_text, chunk_size, chunk_overlap)
+            all_chunks.extend(page_chunks)
+    return all_chunks
+
+def extract_text_from_pdf(pdf_file) -> Generator[str, None, None]:
     """
     Extract text from uploaded PDF file
     
@@ -18,10 +30,10 @@ def extract_text_from_pdf(pdf_file) -> str:
     """
     pdf_reader = pypdf.PdfReader(pdf_file)
     text = ""
-    
     for page in pdf_reader.pages:
-        text += page.extract_text()
-    
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text + "\n"
     return text
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
@@ -38,17 +50,10 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[st
     """
     chunks = []
     start = 0
-    text_length = len(text)
-    
-    while start < text_length:
+    while start < len(text):
         end = start + chunk_size
-        chunk = text[start:end]
-        
-        # Clean up chunk
-        chunk = chunk.strip()
+        chunk = text[start:end].strip()
         if chunk:
             chunks.append(chunk)
-        
         start += chunk_size - overlap
-    
     return chunks

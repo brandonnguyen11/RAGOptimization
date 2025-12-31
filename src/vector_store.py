@@ -5,16 +5,18 @@
 import chromadb
 from chromadb.config import Settings
 from typing import List, Dict
+import os
 
 class VectorStore:
     """Manages document embeddings and retrieval using ChromaDB"""
     
-    def __init__(self):
+    def __init__(self, persist_directory="./chroma_db"):
         """Initialize ChromaDB client and collection"""
-        self.client = chromadb.Client(Settings(
-            anonymized_telemetry=False,
-            is_persistent=False
-        ))
+        if not os.path.exists(persist_directory):
+            os.makedirs(persist_directory)
+
+        # PersistentClient ensures data is written to disk, not just RAM
+        self.client = chromadb.PersistentClient(path=persist_directory)
         
         self.collection = self.client.get_or_create_collection(
             name="financial_reports",
@@ -29,16 +31,23 @@ class VectorStore:
             chunks: List of text chunks to index
             filename: Source document filename
         """
-        ids = [f"{filename}_chunk_{i}" for i in range(len(chunks))]
-        metadatas = [{"source": filename, "chunk_id": i} for i in range(len(chunks))]
-        
-        self.collection.add(
-            documents=chunks,
-            ids=ids,
-            metadatas=metadatas
-        )
+        batch_size = 100
+        total_chunks = len(chunks)
+
+        for i in range(0, total_chunks, batch_size):
+            batch = chunks[i : i + batch_size]
+            
+            # Create IDs and Metadata for this specific batch
+            ids = [f"{filename}_chunk_{i + j}" for j in range(len(batch))]
+            metadatas = [{"source": filename, "chunk_id": i + j} for j in range(len(batch))]
+            
+            self.collection.add(
+                documents=batch,
+                ids=ids,
+                metadatas=metadatas
+            )
     
-    def retrieve(self, query: str, n_results: int = 3) -> Dict:
+    def retrieve(self, query: str, n_results: int = 5) -> Dict:
         """
         Retrieve most relevant chunks for a query
         

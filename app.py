@@ -2,7 +2,7 @@
 # FILE: app.py
 # ============================================
 import streamlit as st
-from src.document_processor import extract_text_from_pdf, chunk_text
+from src.document_processor import process_pdf
 from src.vector_store import VectorStore
 from src.rag_pipeline import RAGPipeline
 from config import *
@@ -34,47 +34,55 @@ with st.sidebar:
     
     st.divider()
     st.header("📁 Upload Financial Reports")
+    # accept_multiple_files=True allows batch processing
     uploaded_files = st.file_uploader("Choose PDF files", type=['pdf'], accept_multiple_files=True)
 
-    # Check if there are NEW files to process
-    if uploaded_files:
+    # Initialize a file tracker in session state if not present
+    if 'indexed_files' not in st.session_state:
+        st.session_state.indexed_files = []
+
+    if uploaded_files and api_key:
         for uploaded_file in uploaded_files:
+            # Only process if this specific file hasn't been indexed yet
             if uploaded_file.name not in st.session_state.indexed_files:
-                with st.spinner(f"Indexing {uploaded_file.name}..."):
-                    # 1. Extract and Chunk
-                    text = extract_text_from_pdf(uploaded_file)
-                    chunks = chunk_text(text, CHUNK_SIZE, CHUNK_OVERLAP)
+                with st.spinner(f"Processing {uploaded_file.name}..."):
                     
-                    # 2. Initialize VectorStore ONLY if it doesn't exist
+                    # 1. NEW: Process large file page-by-page (avoids RAM crash)
+                    # This calls the method from our new document_processor.py
+                    chunks = process_pdf(uploaded_file, CHUNK_SIZE, CHUNK_OVERLAP)
+                    
+                    # 2. Initialize RAG pipeline if first time
                     if st.session_state.rag_pipeline is None:
-                        vs = VectorStore()
+                        # Ensure your VectorStore uses PersistentClient
                         st.session_state.rag_pipeline = RAGPipeline(
-                            vector_store=vs,
+                            vector_store=VectorStore(),
                             api_choice=api_choice,
                             api_key=api_key
                         )
                     
-                    # 3. Add chunks to the existing vector store
+                    # 3. Add chunks using the new BATCH method in vector_store.py
                     st.session_state.rag_pipeline.vector_store.index_chunks(chunks, uploaded_file.name)
+                    
+                    # Update tracking
                     st.session_state.indexed_files.append(uploaded_file.name)
                     st.session_state.document_indexed = True
-                    st.success(f"✅ Added {uploaded_file.name}")
+                
+                st.success(f"✅ Added {uploaded_file.name} ({len(chunks)} chunks)")
 
     # Display List of Loaded Documents
     if st.session_state.indexed_files:
         st.write("---")
-        st.write("📊 **Currently Indexed:**")
+        st.write("📊 **Documents in Database:**")
         for f in st.session_state.indexed_files:
             st.caption(f"• {f}")
-    
-    if st.session_state.document_indexed:
-        st.info("📄 Document ready")
-        if st.button("🗑️ Clear All Documents"):
+        
+        if st.button("🗑️ Clear All Data"):
             st.session_state.rag_pipeline.vector_store.clear()
-            st.session_state.messages = []
-            st.session_state.indexed_files = [] # Reset file tracker
+            #st.session_state.messages = []
+            st.session_state.indexed_files = []
             st.session_state.document_indexed = False
             st.rerun()
+
 
 # Main UI
 st.title("📊 Financial Report AI Assistant")
