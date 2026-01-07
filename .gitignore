@@ -42,4 +42,5 @@ htmlcov/
 .coverage
 structure.txt
 codeHelp.txt
+testapp.py
 
