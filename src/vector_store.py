@@ -11,17 +11,22 @@ class VectorStore:
     """Manages document embeddings and retrieval using ChromaDB"""
     
     def __init__(self, persist_directory="./chroma_db"):
-        """Initialize ChromaDB client and collection"""
+        """Initialize ChromaDB with Disk Persistence"""
+        # Ensure the directory exists
         if not os.path.exists(persist_directory):
             os.makedirs(persist_directory)
 
-        # PersistentClient ensures data is written to disk, not just RAM
+        # 🛠️ Change: PersistentClient saves data to the 'path' folder
         self.client = chromadb.PersistentClient(path=persist_directory)
         
         self.collection = self.client.get_or_create_collection(
             name="financial_reports",
             metadata={"hnsw:space": "cosine"}
         )
+
+    def get_count(self) -> int:
+        """Returns the number of items already in the database"""
+        return self.collection.count()
     
     def index_chunks(self, chunks: List[str], filename: str):
         """
@@ -31,22 +36,23 @@ class VectorStore:
             chunks: List of text chunks to index
             filename: Source document filename
         """
-        batch_size = 100
-        total_chunks = len(chunks)
+        """Only index if the collection is empty to save time"""
+        if self.get_count() > 0:
+            return # Skip if already indexed!
 
-        for i in range(0, total_chunks, batch_size):
+        batch_size = 100
+        for i in range(0, len(chunks), batch_size):
             batch = chunks[i : i + batch_size]
-            
-            # Create IDs and Metadata for this specific batch
-            ids = [f"{filename}_chunk_{i + j}" for j in range(len(batch))]
-            metadatas = [{"source": filename, "chunk_id": i + j} for j in range(len(batch))]
+            ids = [f"{filename}_{i + j}" for j in range(len(batch))]
+            metadatas = [{"source": filename} for _ in range(len(batch))]
             
             self.collection.add(
                 documents=batch,
                 ids=ids,
                 metadatas=metadatas
             )
-    
+
+            
     def retrieve(self, query: str, n_results: int = 5) -> Dict:
         """
         Retrieve most relevant chunks for a query

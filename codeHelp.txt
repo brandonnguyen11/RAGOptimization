@@ -7,3 +7,5 @@ deactivate
 python -m streamlit run app.py
 
 git pull origin firststep
+
+https://github.com/brandonnguyen11/RAGOptimization
